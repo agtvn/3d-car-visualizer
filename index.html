@@ -51,37 +51,47 @@
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
 
+      //define renderer
+      defineRenderer();
+
+      container.appendChild(renderer.domElement);
+
+      //add camera
+      addCamera();
+
+      //add grid
+      addGrid();
+
+      //config control
+      configControl();
+
+      //enviroment, background
+      defineEnviroment();
+
+      
+      // materials
+      defineMaterial();
+
+
+      //load Image3d
+      loadImage3d();
+
+    }
+
+
+    function configControl() {
+      controls = new OrbitControls(camera, container);
+      controls.target.set(0, 0.5, 0);
+      controls.update();
+    }
+
+    function defineRenderer() {
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
       // renderer.setAnimationLoop(render);
       renderer.outputEncoding = THREE.sRGBEncoding;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 0.85;
-      container.appendChild(renderer.domElement);
-
-
-      addCamera();
-
-      addGrid();
-
-      controls = new OrbitControls(camera, container);
-      controls.target.set(0, 0.5, 0);
-      controls.update();
-
-
-
-      //enviroment, background
-      const environment = new RoomEnvironment();
-      const pmremGenerator = new THREE.PMREMGenerator(renderer);
-      scene.background = new THREE.Color(0xffffff);
-      scene.environment = pmremGenerator.fromScene(environment).texture;
-      // scene.fog = new THREE.Fog(0x46a8e4, 10, 50);
-      
-      // materials
-      defineMaterial();
-
-      loadImage3d();
-
     }
 
     function addCamera() {
@@ -104,6 +114,13 @@
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
 
+    }
+
+    function defineEnviroment() {
+      const environment = new RoomEnvironment();
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      scene.background = new THREE.Color(0xffffff);
+      scene.environment = pmremGenerator.fromScene(environment).texture;
     }
 
     function defineMaterial() {
