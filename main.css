@@ -1,0 +1,127 @@
+
+
+
+
+body {
+	margin: 0;
+	background-color: #000;
+	color: #fff;
+	font-family: Monospace;
+	font-size: 13px;
+	line-height: 24px;
+	overscroll-behavior: none;
+}
+
+a {
+	color: #ff0;
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+button {
+	cursor: pointer;
+	text-transform: uppercase;
+}
+
+#info {
+	position: absolute;
+	top: 0px;
+	width: 100%;
+	padding: 10px;
+	box-sizing: border-box;
+	text-align: center;
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	pointer-events: none;
+	z-index: 1; /* TODO Solve this in HTML */
+}
+
+.colorPicker {
+	display: inline-block;
+	margin: 0 10px
+  }
+
+a, button, input, select {
+	pointer-events: auto;
+}
+
+.dg.ac {
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	z-index: 2 !important; /* TODO Solve this in HTML */
+}
+
+#overlay {
+	position: absolute;
+	z-index: 2;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0,0,0,0.7);
+}
+
+	#overlay button {
+		background: #ffffff;
+		border: 0;
+		color: #000000;
+		padding: 16px 20px;
+		text-transform: uppercase;
+		cursor: pointer;
+	}
+
+#notSupported {
+	width: 50%;
+	margin: auto;
+	background-color: #f00;
+	margin-top: 20px;
+	padding: 10px;
+}
+
+#toolBar {
+    width: 290px;
+    height: 40px;
+    left: 50%;
+    margin-left: -145px;
+    bottom: 5px;
+    z-index: 2;
+    position: absolute;
+}
+
+.buttonBG {
+    z-index: 2;
+    background-color: #000;
+    position: absolute;
+    border: 1px solid #fff;
+}
+
+.button {
+    text-align: center;
+    font-size: 1em;
+    color: #eee;
+    line-height: 40px;
+    z-index: 40;
+    position: absolute;
+}
+
+.buttonBG {
+    z-index: 2;
+    background-color: #000;
+    position: absolute;
+    border: 1px solid #fff;
+}
+
+.colorBG {
+    z-index: 3;
+    position: absolute;
+}
