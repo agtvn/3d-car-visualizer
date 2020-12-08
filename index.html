@@ -7,14 +7,13 @@
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
   <link type="text/css" rel="stylesheet" href="main.css">
   <style>
-    
+
   </style>
 </head>
 
 <body>
-
   <div id="container"></div>
-
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
   <script type="module">
 
     import * as THREE from './js/build/three.module.js';
@@ -27,6 +26,7 @@
     import { GLTFLoader } from './js/jsm/loaders/GLTFLoader.js';
     import { DRACOLoader } from './js/jsm/loaders/DRACOLoader.js';
 
+
     let camera, scene, renderer;
     let stats;
 
@@ -36,13 +36,23 @@
     let bodyMaterial;
     let detailsMaterial;
     let glassMaterial;
+    //The loader manager
+    let mManager;
 
+    let mC3DGLTF;
+
+    const mOrbitCamPos = new THREE.Vector3(20, 10, 20);
+
+    //The texture loader
+    let mTextureLoader;
 
     const wheels = [];
+
+    let mConfigJSON;
+    
     init();
 
     function init() {
-
       window.addEventListener('resize', onWindowResize, false);
 
       const container = document.getElementById('container');
@@ -56,6 +66,17 @@
 
       container.appendChild(renderer.domElement);
 
+      $.getJSON("models/data/meta.json", function (json) {
+        //Get reference of the json object
+        mConfigJSON = json;
+
+        LoadConfigurator(mConfigJSON);
+
+        //Load the aventador model
+        loadImage3d(mConfigJSON);
+
+      });
+
       //add camera
       addCamera();
 
@@ -68,14 +89,126 @@
       //enviroment, background
       defineEnviroment();
 
-      
-      // materials
-      defineMaterial();
+    }
+
+    
+    function LoadConfigurator(mConfigJSON) {
+      //The config palette element
+      var config_palette = $([
+        '<div class="configurator-palette">',
+        '<div class="options-palette">',
+        '<nav class="nav-config">',
+        '<ul>',
+        '<li>',
+        '<a class="nav-config-item" data-id="body_colors">',
+        '<span>BODY COLOR</span>',
+        '</a>',
+        '</li>',
+        '<li>',
+        '<a class="nav-config-item" data-id="wheel_designs">',
+        '<span>WHEELS</span>',
+        '</a>',
+        '</li>',
+        '<li>',
+        '<a class="nav-config-item" data-id="wheel_colors">',
+        '<span>WHEEL COLOR</span>',
+        '</a>',
+        '</li>',
+        '</ul>',
+        '</nav>',
+        '<div class="palette-container">',
+        '<div id="body_colors" class="palette-content">',
+        '<ul>',
+        '</ul>',
+        '</div>',
+        '<div id="wheel_designs" class="palette-content">',
+        '<ul>',
+        '</ul>',
+        '</div>',
+
+        '<div id="wheel_colors" class="palette-content">',
+        '<ul>',
+        '</ul>',
+        '</div>',
+        '</div>',
+        '</div>',
+
+        '</div>'].join(''));
+
+      //Append the cofigurator palette to body
+      console.log(config_palette);
+      $('#container').append(config_palette);
+
+      //Upon clicking the config tab
+      $('.nav-config-item', config_palette).click(function () {
+        //Get the clicked tab id
+        var configID = $(this).data('id');
+
+        //If the palette is already active
+        if ($(this).hasClass("active")) {
+          //Empty the container
+          $('#' + configID + " ul", config_palette).empty();
+          $(this).removeClass('active');
+          //Do not execute further
+          return;
+        }
+
+        //Deactivate all config tab links
+        $('.nav-config-item', config_palette).removeClass('active');
+        //Hide all config tab contents
+        $('.palette-content', config_palette).hide();
+
+        //Add object/texture swatch if wheel design
+        if (configID == 'wheel_designs') {
+          AddTextureSwatches($('#' + configID + " ul", config_palette), mConfigJSON[configID], function (targetName) {
+            //Set the corresponding entity object visible
+            SetEntityVisible(mC3DGLTF.scene, targetName);
+
+          });
+        }
+        //Add the color swatches
+        else {
+          AddColorSwatches($('#' + configID + " ul", config_palette), mConfigJSON[configID], (configID == 'mirror_colors') ? mCBodyColor : null, function (color, targetMat) {
+            //Set the corresponding entity color
+            SetEntityColor(color, targetMat);
+            //If changed body color, change mirror color cover also
+            if (targetMat == 'Mt_Body')
+              SetEntityColor(color, 'Mt_MirrorCover');
+
+          });
+        }
+
+        //Set the current clicked tab active
+        $('.nav-config-item[data-id="' + configID + '"]', config_palette).addClass("active");
+        //Show the clicked palette conent
+        $('#' + configID, config_palette).show();
+      });
+
+    }
 
 
-      //load Image3d
-      loadImage3d();
+    //Function to add color swatches
+    function AddColorSwatches(container, configEntity, def, onClickCallback) {
+      //Empty the container
+      $(container).empty();
 
+      //Get the color array
+      var colorList = configEntity.colors.slice(0);;
+
+      //If default color available
+      if (def)
+        colorList.unshift({ "name": "Current", "value": def });
+
+      //Loop through each colors for config entity
+      for (var i = 0; i < colorList.length; i++) {
+        var colorSwatch = $('<li><button class="color-swatch"><span>' + colorList[i].name + '</span></button></li>');
+        //Set the color swatch
+        $('button', colorSwatch).css({ "background": colorList[i].value });
+        //Trigger the callback with data on clicking swatch button
+        $('button', colorSwatch).click(function (color, target) { return function () { onClickCallback(color, target) }; }(colorList[i].value, configEntity.target));
+        //Add the color swatch to corresponding container
+        $(container).append(colorSwatch);
+      }
     }
 
 
@@ -83,6 +216,31 @@
       controls = new OrbitControls(camera, container);
       controls.target.set(0, 0.5, 0);
       controls.update();
+    }
+
+    function SetEntityVisible(nodeObject, targetName) {
+
+      // console.log(nodeObject);
+      // console.log(targetName);
+      //Traverse through the object
+      nodeObject.traverse(function (object) {
+        
+        //If this is a rim object
+        if (object.name.includes('Obj_Rim')) {
+
+          //Show if name matches target, else hide it
+          if (object.name.includes(targetName)) {
+            object.visible = true;
+          } else object.visible = false;
+
+          if (object.visible) {
+            wheels.push(
+              object
+            );
+          }
+        }
+
+      });
     }
 
     function defineRenderer() {
@@ -95,10 +253,12 @@
     }
 
     function addCamera() {
-      camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000000);
-      // camera.position.set(4.25, 1.4, - 4.5);
-      camera.position.set(0.5, 3.5, 8);
-      camera.lookAt(0, 1, 0);
+      // camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000000);
+      // // camera.position.set(4.25, 1.4, - 4.5);
+      // camera.position.set(0.5, 3.5, 8);
+      // camera.lookAt(0, 1, 0);
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.copy(mOrbitCamPos);
     }
 
     function addGrid() {
@@ -123,79 +283,208 @@
       scene.environment = pmremGenerator.fromScene(environment).texture;
     }
 
-    function defineMaterial() {
 
-      bodyMaterial = new THREE.MeshPhysicalMaterial({
-        color: 0xff0000, metalness: 0.6, roughness: 0.4, clearcoat: 0.05, clearcoatRoughness: 0.05
-      });
+    let mCBodyColor;
+    function loadImage3d(config) {
 
-      detailsMaterial = new THREE.MeshStandardMaterial({
-        color: 0xffffff, metalness: 1.0, roughness: 0.5
-      });
+      var stpIndex = 3;
 
-      glassMaterial = new THREE.MeshPhysicalMaterial({
-        color: 0xffffff, metalness: 0, roughness: 0.1, transmission: 0.9, transparent: true
-      });
+      mCBodyColor = config.body_colors.colors[stpIndex].value;
+      mManager = new THREE.LoadingManager();
+      //Callback to be triggered for load progress
+      // mManager.onProgress = OnLoadProgress;
+      //Callback to be triggered when loading completed successfully
+      // mManager.onLoad =OnLoadCompleted;
+      //Callback to be triggered when load errror occured 
+      // mManager.onError =OnLoadError;  
 
-    }
+      //Creat the texture loader  
+      mTextureLoader = new THREE.TextureLoader(mManager);
 
+      //Get the startup colors for configurables
+      var dfCol_Body = webColorToHex(mCBodyColor);
+      var dfCol_Mirror = webColorToHex(config.mirror_colors.colors[0].value);
+      var dfCol_Alloys = webColorToHex(config.wheel_colors.colors[0].value);
+      var dfCol_Caliper = webColorToHex(config.caliper_colors.colors[0].value);
 
-    function loadImage3d() {
-      
+      var AventadorAtlas_Albedo = LoadTextureCorrected(mTextureLoader, "models/data/AventadorAtlas_Albedo.png");
+      var AventadorAtlas_Normal = LoadTextureCorrected(mTextureLoader, "models/data/AventadorAtlas_Normal.png");
+      var LR_Brake_Albedo = LoadTextureCorrected(mTextureLoader, "models/data/LR_Brake_Albedo.png");
+      var LR_Turn_Albedo = LoadTextureCorrected(mTextureLoader, "models/data/LR_Turn_Albedo.png");
+      var LR_Reverse_Albedo = LoadTextureCorrected(mTextureLoader, "models/data/LR_Reverse_Albedo.png");
+      var LR_Generic_Normal = LoadTextureCorrected(mTextureLoader, "models/data/LR_Generic_Normal.png");
+
+      //Create the necessary materials
+      var Mt_Abs_Black_Gloss = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.0, metalness: 0.0 });
+      var Mt_ABS_Black_Mat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.5, metalness: 0.5 });
+      var Mt_Abs_White_Mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.0, metalness: 0.0 });
+      var Mt_AlloyWheels = new THREE.MeshStandardMaterial({ name: 'Mt_AlloyWheels', color: dfCol_Alloys, roughness: 0.1, metalness: 0.5 });
+
+      var Mt_AventadorAtlas = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.5, map: AventadorAtlas_Albedo, transparent: true });
+
+      var Mt_Body = new THREE.MeshStandardMaterial({ name: 'Mt_Body', color: dfCol_Body, roughness: 0.0, metalness: 0.0 });
+      var Mt_BrakeCaliper = new THREE.MeshStandardMaterial({ name: 'Mt_BrakeCaliper', color: dfCol_Caliper, roughness: 0.5, metalness: 0.5 });
+      var Mt_Chrome = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.0, metalness: 1.0 });
+      var Mt_Glass_Lens = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.0, metalness: 0.25 });
+
+      var Mt_Glass_Translucent = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.0, metalness: 1.0, transparent: true, opacity: 0.25 });
+
+      var Mt_Interior_Black = new THREE.MeshStandardMaterial({ color: 0x525252, roughness: 0.5, metalness: 0.5 });
+      var Mt_Metal_Black_Glossy = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.1, metalness: 0.5 });
+      var Mt_Metal_Brushed = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.0, metalness: 1.0 });
+      var Mt_Mirror = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.0, metalness: 1.0 });
+      var Mt_MirrorCover = new THREE.MeshStandardMaterial({ name: 'Mt_MirrorCover', color: dfCol_Body, roughness: 0.0, metalness: 0.0 });
+      var Mt_Reflector_BL = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 1.0, metalness: 0.0, map: LR_Brake_Albedo, normalMap: LR_Generic_Normal });
+      var Mt_Reflector_RL = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 1.0, metalness: 0.0, map: LR_Reverse_Albedo, normalMap: LR_Generic_Normal });
+      var Mt_Reflector_TL = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 1.0, metalness: 0.0, map: LR_Turn_Albedo, normalMap: LR_Generic_Normal });
+      var Mt_TurnLights = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.5, metalness: 0.5 });
+      var Mt_Tyres = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.5, metalness: 0.5, map: AventadorAtlas_Albedo, normalMap: AventadorAtlas_Normal });
+      var Mt_WindScreens = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.0, metalness: 0.0, transparent: true, opacity: 0.25 });
+
       const dracoLoader = new DRACOLoader();
 
       const loader = new GLTFLoader();
       const shadow = new THREE.TextureLoader().load('./models/ferrari_ao.png');
-      
+
       dracoLoader.setDecoderPath('js/libs/draco/gltf/');
 
-      
+
       loader.setDRACOLoader(dracoLoader);
 
-      loader.load('./models/ferrari.glb', function (gltf) {
+      loader.load('./models/data/aventador.gltf', function (gltf) {
+        console.log(gltf);
         carModel = gltf.scene.children[0];
 
-        carModel.getObjectByName('body').material = bodyMaterial;
+        mC3DGLTF = gltf;
 
-        carModel.getObjectByName('rim_fl').material = detailsMaterial;
-        carModel.getObjectByName('rim_fr').material = detailsMaterial;
-        carModel.getObjectByName('rim_rr').material = detailsMaterial;
-        carModel.getObjectByName('rim_rl').material = detailsMaterial;
-        carModel.getObjectByName('trim').material = detailsMaterial;
+        mC3DGLTF.scene.traverse(function (obj) {
+          if (obj instanceof THREE.Mesh) {
 
-        carModel.getObjectByName('glass').material = glassMaterial;
+            //Assign new materials
+            if (obj.material.name == "Mt_Abs_Black_Gloss")
+              obj.material = Mt_Abs_Black_Gloss;
+            if (obj.material.name == "Mt_ABS_Black_Mat")
+              obj.material = Mt_ABS_Black_Mat;
+            if (obj.material.name == "Mt_Abs_White_Mat")
+              obj.material = Mt_Abs_White_Mat;
+            if (obj.material.name == "Mt_AlloyWheels")
+              obj.material = Mt_AlloyWheels;
+            if (obj.material.name == "Mt_AventadorAtlas")
+              obj.material = Mt_AventadorAtlas;
+            if (obj.material.name == "Mt_Body")
+              obj.material = Mt_Body;
+            if (obj.material.name == "Mt_BrakeCaliper")
+              obj.material = Mt_BrakeCaliper;
+            if (obj.material.name == "Mt_Chrome")
+              obj.material = Mt_Chrome;
+            if (obj.material.name == "Mt_Glass_Lens")
+              obj.material = Mt_Glass_Lens;
+            if (obj.material.name == "Mt_Glass_Translucent")
+              obj.material = Mt_Glass_Translucent;
+            if (obj.material.name == "Mt_Interior_Black")
+              obj.material = Mt_Interior_Black;
+            if (obj.material.name == "Mt_Metal_Black_Glossy")
+              obj.material = Mt_Metal_Black_Glossy;
+            if (obj.material.name == "Mt_Metal_Brushed")
+              obj.material = Mt_Metal_Brushed;
+            if (obj.material.name == "Mt_Mirror")
+              obj.material = Mt_Mirror;
+            if (obj.material.name == "Mt_MirrorCover")
+              obj.material = Mt_MirrorCover;
+            if (obj.material.name == "Mt_Reflector_BL")
+              obj.material = Mt_Reflector_BL;
+            if (obj.material.name == "Mt_Reflector_RL")
+              obj.material = Mt_Reflector_RL;
+            if (obj.material.name == "Mt_Reflector_TL")
+              obj.material = Mt_Reflector_TL;
+            if (obj.material.name == "Mt_TurnLights")
+              obj.material = Mt_TurnLights;
+            if (obj.material.name == "Mt_Tyres")
+              obj.material = Mt_Tyres;
+            if (obj.material.name == "Mt_WindScreens")
+              obj.material = Mt_WindScreens;
 
-        wheels.push(
-          carModel.getObjectByName('wheel_fl'),
-          carModel.getObjectByName('wheel_fr'),
-          carModel.getObjectByName('wheel_rl'),
-          carModel.getObjectByName('wheel_rr')
-        );
 
-        // shadow
-        const mesh = new THREE.Mesh(
-          new THREE.PlaneBufferGeometry(0.655 * 4, 1.3 * 4),
-          new THREE.MeshBasicMaterial({
-            map: shadow, blending: THREE.MultiplyBlending, toneMapped: false, transparent: true
-          })
-        );
-        mesh.rotation.x = - Math.PI / 2;
-        mesh.renderOrder = 2;
-        carModel.add(mesh);
+          }
 
-        scene.add(carModel);
+          // console.log(obj);
+          //If this is a rim object and not the first type
+          if (obj.name.includes('Obj_Rim') && !obj.name.includes(config.wheel_designs.designs[0].value)) {
+            obj.visible = false;
+            // console.log(obj);
+          } else if (obj.name.includes('Obj_Rim') && obj.visible) {
+            wheels.push(
+              obj
+            );
+          }
+
+        });
+
+        scene.add(mC3DGLTF.scene);
 
         render();
 
       });
     }
 
+    function AddTextureSwatches(container, configEntity, onClickCallback) {
+      //Empty the container
+      $(container).empty();
+
+      //Loop through each entry in config entity
+      for (var i = 0; i < configEntity.designs.length; i++) {
+        var url = "models/data/" + configEntity.designs[i].thumb;
+        //Create the texture swatch object
+        var textureSwatch = $('<li><button class="texture-swatch"><span>' + configEntity.designs[i].name + '</span></button></li>');
+        $('button', textureSwatch).css({ 'background-image': 'url(' + url + ')' });
+        //Trigger the callback with data on clicking swatch button
+        $('button', textureSwatch).click(function (targetName) { return function () { onClickCallback(targetName); }; }(configEntity.designs[i].value));
+        //Add the texture swatch to corresponding container
+        $(container.append(textureSwatch));
+      }
+    }
+
+
+    //Function to set the color of an entityt
+    function SetEntityColor(color, targetMat) {
+      mC3DGLTF.scene.traverse(function (obj) {
+        if (obj instanceof THREE.Mesh) {
+          if (obj.material.name == targetMat) {
+            //Set the material color
+            obj.material.color.setHex(webColorToHex(color));
+
+            //Cache if current body color changed
+            if (targetMat == 'Mt_Body')
+              mCBodyColor = color;
+
+            //Return after changing one material
+            return;
+          }
+        }
+      });
+    }
+
+    function LoadTextureCorrected(_loader, _path) {
+      //Load the texture
+      var texture = _loader.load(_path);
+      //Set repeat wrapping
+      texture.wrapT = texture.wrapS = THREE.RepeatWrapping;
+      //Flip texture vertically
+      texture.repeat.y = - 1;
+      //Return the corrected texture
+      return texture;
+    }
+
+    function webColorToHex(color) {
+      return parseInt(color.replace("#", "0x"));
+    }
+
 
     function render() {
       requestAnimationFrame(render);
       renderer.render(scene, camera);
-
     }
+
 
 
   </script>
