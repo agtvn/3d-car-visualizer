@@ -41,7 +41,7 @@
 
     let mC3DGLTF;
 
-    const mOrbitCamPos = new THREE.Vector3(20, 10, 20);
+    const mOrbitCamPos = new THREE.Vector3(40, 30, 60);
 
     //The texture loader
     let mTextureLoader;
@@ -235,7 +235,7 @@
 
           if (object.visible) {
             wheels.push(
-              object
+              object.parent
             );
           }
         }
@@ -262,7 +262,7 @@
     }
 
     function addGrid() {
-      grid = new THREE.GridHelper(100, 40, 0x000000, 0x000000);
+      grid = new THREE.GridHelper(1000, 400, 0x000000, 0x000000);
       grid.material.opacity = 0.1;
       grid.material.depthWrite = false;
       grid.material.transparent = true;
@@ -413,12 +413,15 @@
             obj.visible = false;
             // console.log(obj);
           } else if (obj.name.includes('Obj_Rim') && obj.visible) {
+            console.log(obj.parent);
             wheels.push(
-              obj
+              obj.parent
             );
           }
 
         });
+
+        console.log(wheels);
 
         scene.add(mC3DGLTF.scene);
 
@@ -426,6 +429,8 @@
 
       });
     }
+
+    
 
     function AddTextureSwatches(container, configEntity, onClickCallback) {
       //Empty the container
@@ -482,6 +487,7 @@
 
     function render() {
       requestAnimationFrame(render);
+      const newWheels = wheels.filter(item => item.visible);
       if (keyDown[38]) {
         if (speed < 130) {
           speed += 1;
@@ -493,13 +499,62 @@
         if (speed < 0) speed = 0;
       }
       if (speed > 0) {
-        // calculate distance car move
-      }
+        if (keyDown[37]) {
+          carModel.rotation.y += speed * 0.0001;
+          for (let i = 0; i < newWheels.length; i++) {
+            newWheels[i].rotation.y =  (speed / 20) * Math.PI / 180;
+            if (newWheels[i].rotation.y >= 0.2) {
+              newWheels[i].rotation.y = 0.2;
+            }
+          }
+        }
+        if (keyDown[39]) {
+          carModel.rotation.y -= speed * 0.0001;
+          for (let i = 0; i < newWheels.length; i++) {
+            newWheels[i].rotation.y =  -((speed / 20) * Math.PI / 180);
+            if (newWheels[i].rotation.y >= 0.2) {
+              newWheels[i].rotation.y = 0.2;
+            }
+          }
+        }
+        for (let i = 0; i < newWheels.length; i++) {
+          if (newWheels[i].name.indexOf('DiscRotor_FL') !== -1 || newWheels[i].name.indexOf('DiscRotor_RL') !== -1) {
+            newWheels[i].rotation.z +=  (speed / 10) * Math.PI / 180;
+          } else {
+            newWheels[i].rotation.z -=  (speed / 10) * Math.PI / 180;
+          }
+        }
 
+        carModel.position.z += speed * (Math.sin(carModel.rotation.y) / 200);
+        carModel.position.x -= speed * (Math.cos(carModel.rotation.y) / 200);
+      }
+      moveCamera();
       renderer.render(scene, camera);
+
     }
 
-    
+    function moveCamera() {
+
+      let rotation = 0;
+      var delta = new THREE.Clock().getDelta();
+      var sensitivity = 150;
+      var rotateAngle = Math.PI / 2 * delta * sensitivity;
+      if (keyDown[37]) {
+          rotation -= rotateAngle;
+      }
+      if (keyDown[39]) {
+          rotation += rotateAngle;
+      }
+      var rotZ = Math.cos(rotation)
+      var rotX = Math.sin(rotation)
+      var distance = 200;
+      camera.position.x = carModel.position.x - (distance * rotX ) + (distance * 0.2);
+      camera.position.y = carModel.position.y + 30;
+      camera.position.z = carModel.position.z - -(distance * rotZ * 0.3);
+      camera.lookAt(carModel.position);
+      // controls.reset();
+    }
+
     let speed = 0;
     let keyDown = new Array();
     for (let i = 0; i < 300; i++) {
