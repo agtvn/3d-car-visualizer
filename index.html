@@ -27,7 +27,7 @@
     import { DRACOLoader } from './js/jsm/loaders/DRACOLoader.js';
 
 
-    let camera, scene, renderer;
+    let camera, scene, renderer, mesh;
     let stats;
 
     let grid;
@@ -49,11 +49,12 @@
     const wheels = [];
 
     let mConfigJSON;
-    
     init();
 
     function init() {
       window.addEventListener('resize', onWindowResize, false);
+
+      
 
       const container = document.getElementById('container');
 
@@ -214,8 +215,20 @@
 
     function configControl() {
       controls = new OrbitControls(camera, container);
-      controls.target.set(0, 0.5, 0);
+      // controls.target.set(0, 0.5, 0);
+      // controls.enablePan = false;
+      // controls.enableZoom = true; 
+      // controls.enableDamping = true;
+      // controls.minPolarAngle = 0.75; //Uper
+      // controls.maxPolarAngle = 1.6; //Lower
+      // controls.dampingFactor = 0.07;
+      controls.rotateSpeed = 0.07;
+      // controls.minDistance = 16
+      // controls.maxDistance = 32;
+      // controls.autoRotate = true;
+      // controls.autoRotateSpeed = 0.05;
       controls.update();
+
     }
 
     function SetEntityVisible(nodeObject, targetName) {
@@ -259,6 +272,7 @@
       // camera.lookAt(0, 1, 0);
       camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
       camera.position.copy(mOrbitCamPos);
+
     }
 
     function addGrid() {
@@ -488,6 +502,8 @@
     function render() {
       requestAnimationFrame(render);
       const newWheels = wheels.filter(item => item.visible);
+      
+
       if (keyDown[38]) {
         if (speed < 130) {
           speed += 1;
@@ -527,14 +543,16 @@
 
         carModel.position.z += speed * (Math.sin(carModel.rotation.y) / 200);
         carModel.position.x -= speed * (Math.cos(carModel.rotation.y) / 200);
+        moveCamera();
       }
-      moveCamera();
+
+      camera.lookAt(carModel.position);
+      
       renderer.render(scene, camera);
 
     }
 
     function moveCamera() {
-
       let rotation = 0;
       var delta = new THREE.Clock().getDelta();
       var sensitivity = 150;
@@ -551,8 +569,14 @@
       camera.position.x = carModel.position.x - (distance * rotX ) + (distance * 0.2);
       camera.position.y = carModel.position.y + 30;
       camera.position.z = carModel.position.z - -(distance * rotZ * 0.3);
-      camera.lookAt(carModel.position);
-      // controls.reset();
+      
+      const cameraX = camera.position.x - 60;
+      const cameraY = camera.position.y - 45;
+      const cameraZ = camera.position.z - 90;
+
+      controls.target.set(cameraX,cameraY,cameraZ );
+      controls.update();
+      camera.updateMatrix();
     }
 
     let speed = 0;
