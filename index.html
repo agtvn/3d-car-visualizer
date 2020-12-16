@@ -290,8 +290,12 @@
     function defineEnviroment() {
       const environment = new RoomEnvironment();
       const pmremGenerator = new THREE.PMREMGenerator(renderer);
-      scene.background = new THREE.Color(0xffffff);
-      scene.environment = pmremGenerator.fromScene(environment).texture;
+      const loader = new THREE.TextureLoader();
+      const bgTexture = loader.load('https://threejsfundamentals.org/threejs/resources/images/daikanyama.jpg');
+      scene.background = bgTexture;
+      // scene.background = new THREE.Color( 0xeeeeee );
+      scene.environment = pmremGenerator.fromScene( environment ).texture;
+      scene.fog = new THREE.Fog( 0xeeeeee, 100, 500 );
     }
 
 
@@ -495,7 +499,9 @@
       return parseInt(color.replace("#", "0x"));
     }
 
-
+    var spinAngle = 0;
+    var steerAngle = 0;
+    var steerAngleTarget = 0;
     function render() {
       requestAnimationFrame(render);
       const newWheels = wheels.filter(item => item.visible);
@@ -510,23 +516,24 @@
         if (speed < 0) speed = 0;
       }
       if (speed > 0) {
+        steerAngle = THREE.MathUtils.lerp(steerAngle, steerAngleTarget, 0.1);
         if (keyDown[37]) {
+          steerAngleTarget = Math.PI / 6;
           carModel.rotation.y += speed * 0.0001;
           for (let i = 0; i < newWheels.length; i++) {
-            newWheels[i].rotation.y =  (speed / 20) * Math.PI / 180;
-            if (newWheels[i].rotation.y >= 0.2) {
-              newWheels[i].rotation.y = 0.2;
-            }
+            newWheels[i].rotation.y = steerAngle / 3;
           }
+
+          
         }
         if (keyDown[39]) {
+          steerAngleTarget = - Math.PI / 6;
           carModel.rotation.y -= speed * 0.0001;
           for (let i = 0; i < newWheels.length; i++) {
-            newWheels[i].rotation.y =  -((speed / 20) * Math.PI / 180);
-            if (newWheels[i].rotation.y >= 0.2) {
-              newWheels[i].rotation.y = 0.2;
-            }
+            newWheels[i].rotation.y = steerAngle / 3
           }
+          
+          
         }
         for (let i = 0; i < newWheels.length; i++) {
           if (newWheels[i].name.indexOf('DiscRotor_FL') !== -1 || newWheels[i].name.indexOf('DiscRotor_RL') !== -1) {
@@ -542,7 +549,6 @@
         camera.position.z += speed * (Math.sin(carModel.rotation.y) / 200);
         moveCamera();
       }
-
       camera.lookAt(carModel.position);
       renderer.render(scene, camera);
     }
