@@ -41,7 +41,7 @@
 
     let mC3DGLTF;
 
-    const mOrbitCamPos = new THREE.Vector3(40, 30, 60);
+    const mOrbitCamPos = new THREE.Vector3(40, 10, 20);
 
     //The texture loader
     let mTextureLoader;
@@ -49,6 +49,10 @@
     const wheels = [];
 
     let mConfigJSON;
+
+    let lightHolder = new THREE.Group();
+    
+    let envMap;
 
     init();
 
@@ -59,12 +63,65 @@
 
       scene = new THREE.Scene();
 
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 200);
+      camera.position.copy(mOrbitCamPos);
+
+      controls = new OrbitControls( camera, container );
+      controls.rotateSpeed = 0.07;
+      controls.update();
+      scene.fog = new THREE.Fog( 0xd7cbb1, 50, 150 );
+      envMap = new THREE.CubeTextureLoader()
+        .setPath('img/textures/cube/skyboxsun25deg/')
+        .load(['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg']);
+
+      scene.background = envMap;
+
+      var ground = new THREE.Mesh(
+        new THREE.PlaneBufferGeometry(2400, 2400),
+        new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.15, depthWrite: false }
+        ));
+      ground.rotation.x = - Math.PI / 2;
+      ground.receiveShadow = true;
+      ground.renderOrder = 1;
+      scene.add(ground);
+
+      var grid = new THREE.GridHelper(2400, 240, 0x000000, 0x000000);
+      grid.material.opacity = 0.2;
+      grid.material.depthWrite = false;
+      grid.material.transparent = true;
+      scene.add(grid);
+
+      var hemiLight = new THREE.HemisphereLight(0x7c849b, 0xd7cbb1, 0.1);
+      hemiLight.position.set(0, 1, 0);
+      scene.add(hemiLight);
+
+      const shadowLight = new THREE.DirectionalLight(0xffffff, 0.1);
+      shadowLight.position.set(-1.5, 1.5, 1.5);
+      shadowLight.castShadow = true;
+      shadowLight.shadow.width = 512;
+      shadowLight.shadow.height = 512;
+      shadowLight.shadow.camera.top = 2;
+      shadowLight.shadow.camera.bottom = -2;
+      shadowLight.shadow.camera.left = -2.5;
+      shadowLight.shadow.camera.right = 2.5;
+      shadowLight.shadow.camera.far = 5.5;
+      shadowLight.shadow.bias = -0.025;
+
+
       renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.gammaOutput = true;
+      renderer.shadowMap.enabled = true;
+      renderer.setSize(window.innerWidth, window.innerHeight);
 
-      //define renderer
-      defineRenderer();
-
+      lightHolder.add(shadowLight, shadowLight.target);
+      const environment = new RoomEnvironment();
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      // scene.background = new THREE.Color( 0xeeeeee );
+      scene.environment = pmremGenerator.fromScene(environment).texture;
       container.appendChild(renderer.domElement);
+
+      
 
       $.getJSON("models/data/meta.json", function (json) {
         //Get reference of the json object
@@ -76,22 +133,9 @@
         loadImage3d(mConfigJSON);
 
       });
-
-      //add camera
-      addCamera();
-
-      //add grid
-      addGrid();
-
-      //config control
-      configControl();
-
-      //enviroment, background
-      defineEnviroment();
-
     }
 
-    
+
     function LoadConfigurator(mConfigJSON) {
       //The config palette element
       var config_palette = $([
@@ -235,7 +279,7 @@
       // console.log(targetName);
       //Traverse through the object
       nodeObject.traverse(function (object) {
-        
+
         //If this is a rim object
         if (object.name.includes('Obj_Rim')) {
 
@@ -255,12 +299,19 @@
     }
 
     function defineRenderer() {
+      // renderer.setPixelRatio(window.devicePixelRatio);
+      // renderer.setSize(window.innerWidth, window.innerHeight);
+      // // renderer.setAnimationLoop(render);
+      // renderer.outputEncoding = THREE.sRGBEncoding;
+      // renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      // renderer.toneMappingExposure = 0.85;
+
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.gammaOutput = true;
+      renderer.shadowMap.enabled = true;
       renderer.setSize(window.innerWidth, window.innerHeight);
-      // renderer.setAnimationLoop(render);
-      renderer.outputEncoding = THREE.sRGBEncoding;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 0.85;
     }
 
     function addCamera() {
@@ -268,8 +319,13 @@
       // // camera.position.set(4.25, 1.4, - 4.5);
       // camera.position.set(0.5, 3.5, 8);
       // camera.lookAt(0, 1, 0);
-      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      // camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      // camera.position.copy(mOrbitCamPos);
+
+
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 200);
       camera.position.copy(mOrbitCamPos);
+      // camera.position.set( 3.25, 1.25, -5 );
     }
 
     function addGrid() {
@@ -290,12 +346,8 @@
     function defineEnviroment() {
       const environment = new RoomEnvironment();
       const pmremGenerator = new THREE.PMREMGenerator(renderer);
-      const loader = new THREE.TextureLoader();
-      const bgTexture = loader.load('https://threejsfundamentals.org/threejs/resources/images/daikanyama.jpg');
-      scene.background = bgTexture;
       // scene.background = new THREE.Color( 0xeeeeee );
-      scene.environment = pmremGenerator.fromScene( environment ).texture;
-      scene.fog = new THREE.Fog( 0xeeeeee, 100, 500 );
+      scene.environment = pmremGenerator.fromScene(environment).texture;
     }
 
 
@@ -330,31 +382,31 @@
       var LR_Generic_Normal = LoadTextureCorrected(mTextureLoader, "models/data/LR_Generic_Normal.png");
 
       //Create the necessary materials
-      var Mt_Abs_Black_Gloss = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.0, metalness: 0.0 });
-      var Mt_ABS_Black_Mat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.5, metalness: 0.5 });
-      var Mt_Abs_White_Mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.0, metalness: 0.0 });
-      var Mt_AlloyWheels = new THREE.MeshStandardMaterial({ name: 'Mt_AlloyWheels', color: dfCol_Alloys, roughness: 0.1, metalness: 0.5 });
+      var Mt_Abs_Black_Gloss = new THREE.MeshStandardMaterial({ color: 0x000000, envMap: envMap, metalness: 0.9, roughness: 0.2 });
+      var Mt_ABS_Black_Mat = new THREE.MeshStandardMaterial({ color: 0x000000, envMap: envMap, metalness: 0.9, roughness: 0.2 });
+      var Mt_Abs_White_Mat = new THREE.MeshStandardMaterial({ color: 0xffffff, envMap: envMap, metalness: 0.9, roughness: 0.2 });
+      var Mt_AlloyWheels = new THREE.MeshStandardMaterial({ name: 'Mt_AlloyWheels', envMap: envMap, color: dfCol_Alloys, metalness: 0.9, roughness: 0.2 });
 
-      var Mt_AventadorAtlas = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.5, map: AventadorAtlas_Albedo, transparent: true });
+      var Mt_AventadorAtlas = new THREE.MeshStandardMaterial({ color: 0xffffff, envMap: envMap, metalness: 0.9, roughness: 0.2, map: AventadorAtlas_Albedo, transparent: true });
 
-      var Mt_Body = new THREE.MeshStandardMaterial({ name: 'Mt_Body', color: dfCol_Body, roughness: 0.0, metalness: 0.0 });
-      var Mt_BrakeCaliper = new THREE.MeshStandardMaterial({ name: 'Mt_BrakeCaliper', color: dfCol_Caliper, roughness: 0.5, metalness: 0.5 });
-      var Mt_Chrome = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.0, metalness: 1.0 });
-      var Mt_Glass_Lens = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.0, metalness: 0.25 });
+      var Mt_Body = new THREE.MeshStandardMaterial({ name: 'Mt_Body', envMap: envMap, color: dfCol_Body, metalness: 0.9, roughness: 0.2 });
+      var Mt_BrakeCaliper = new THREE.MeshStandardMaterial({ name: 'Mt_BrakeCaliper', envMap: envMap, color: dfCol_Caliper, metalness: 0.9, roughness: 0.2 });
+      var Mt_Chrome = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, envMap: envMap, metalness: 0.9, roughness: 0.2 });
+      var Mt_Glass_Lens = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, envMap: envMap, metalness: 0.9, roughness: 0.2 });
 
-      var Mt_Glass_Translucent = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.0, metalness: 1.0, transparent: true, opacity: 0.25 });
+      var Mt_Glass_Translucent = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, envMap: envMap, metalness: 0.9, roughness: 0.2, transparent: true, opacity: 0.25 });
 
-      var Mt_Interior_Black = new THREE.MeshStandardMaterial({ color: 0x525252, roughness: 0.5, metalness: 0.5 });
-      var Mt_Metal_Black_Glossy = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.1, metalness: 0.5 });
-      var Mt_Metal_Brushed = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.0, metalness: 1.0 });
-      var Mt_Mirror = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.0, metalness: 1.0 });
-      var Mt_MirrorCover = new THREE.MeshStandardMaterial({ name: 'Mt_MirrorCover', color: dfCol_Body, roughness: 0.0, metalness: 0.0 });
-      var Mt_Reflector_BL = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 1.0, metalness: 0.0, map: LR_Brake_Albedo, normalMap: LR_Generic_Normal });
-      var Mt_Reflector_RL = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 1.0, metalness: 0.0, map: LR_Reverse_Albedo, normalMap: LR_Generic_Normal });
-      var Mt_Reflector_TL = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 1.0, metalness: 0.0, map: LR_Turn_Albedo, normalMap: LR_Generic_Normal });
-      var Mt_TurnLights = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.5, metalness: 0.5 });
-      var Mt_Tyres = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.5, metalness: 0.5, map: AventadorAtlas_Albedo, normalMap: AventadorAtlas_Normal });
-      var Mt_WindScreens = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.0, metalness: 0.0, transparent: true, opacity: 0.25 });
+      var Mt_Interior_Black = new THREE.MeshStandardMaterial({ color: 0x525252, envMap: envMap, metalness: 0.9, roughness: 0.2 });
+      var Mt_Metal_Black_Glossy = new THREE.MeshStandardMaterial({ color: 0x000000, envMap: envMap, metalness: 0.9, roughness: 0.2 });
+      var Mt_Metal_Brushed = new THREE.MeshStandardMaterial({ color: 0x555555, envMap: envMap, metalness: 0.9, roughness: 0.2 });
+      var Mt_Mirror = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, envMap: envMap, metalness: 0.9, roughness: 0.2 });
+      var Mt_MirrorCover = new THREE.MeshStandardMaterial({ name: 'Mt_MirrorCover', envMap: envMap, color: dfCol_Body, metalness: 0.9, roughness: 0.2 });
+      var Mt_Reflector_BL = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, envMap: envMap, metalness: 0.9, roughness: 0.2, map: LR_Brake_Albedo, normalMap: LR_Generic_Normal });
+      var Mt_Reflector_RL = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, envMap: envMap, metalness: 0.9, roughness: 0.2, map: LR_Reverse_Albedo, normalMap: LR_Generic_Normal });
+      var Mt_Reflector_TL = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, envMap: envMap, metalness: 0.9, roughness: 0.2, map: LR_Turn_Albedo, normalMap: LR_Generic_Normal });
+      var Mt_TurnLights = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, envMap: envMap, metalness: 0.9, roughness: 0.2 });
+      var Mt_Tyres = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, envMap: envMap, metalness: 0.9, roughness: 0.2, map: AventadorAtlas_Albedo, normalMap: AventadorAtlas_Normal });
+      var Mt_WindScreens = new THREE.MeshStandardMaterial({ color: 0x000000, envMap: envMap, metalness: 0.9, roughness: 0.2, transparent: true, opacity: 0.25 });
 
       const dracoLoader = new DRACOLoader();
 
@@ -369,6 +421,21 @@
       loader.load('./models/data/aventador.gltf', function (gltf) {
         console.log(gltf);
         carModel = gltf.scene.children[0];
+        carModel.add(lightHolder);
+
+        carModel.traverse( function ( child ) {
+
+          if ( child.isMesh  ) {
+
+            child.castShadow = true;
+            child.receiveShadow = true;
+            child.material.envMap = envMap;
+
+            console.log( child.material );
+
+          }
+
+          } );
 
         mC3DGLTF = gltf;
 
@@ -435,8 +502,21 @@
           }
 
         });
-
-        console.log(wheels);
+        // const mesh = new THREE.Mesh(
+				// 		new THREE.PlaneBufferGeometry( 0.655 * 4, 1.3 * 4 ),
+				// 		new THREE.MeshBasicMaterial( {
+				// 			map: shadow, blending: THREE.MultiplyBlending, toneMapped: false, transparent: true
+				// 		} )
+        //   );
+          
+          var mesh = new THREE.Mesh(
+						new THREE.PlaneBufferGeometry( 0.655 * 4, 1.3 * 4 ),
+						new THREE.MeshBasicMaterial( { map: shadow, opacity: 0.8, transparent: true } )
+					);
+          mesh.rotation.x = - Math.PI / 2;
+          mesh.rotation.z = - Math.PI / 2;
+					mesh.renderOrder = 2;
+					// carModel.add( mesh );
 
         scene.add(mC3DGLTF.scene);
 
@@ -445,7 +525,7 @@
       });
     }
 
-    
+
 
     function AddTextureSwatches(container, configEntity, onClickCallback) {
       //Empty the container
@@ -524,7 +604,7 @@
             newWheels[i].rotation.y = steerAngle / 3;
           }
 
-          
+
         }
         if (keyDown[39]) {
           steerAngleTarget = - Math.PI / 6;
@@ -532,14 +612,14 @@
           for (let i = 0; i < newWheels.length; i++) {
             newWheels[i].rotation.y = steerAngle / 3
           }
-          
-          
+
+
         }
         for (let i = 0; i < newWheels.length; i++) {
           if (newWheels[i].name.indexOf('DiscRotor_FL') !== -1 || newWheels[i].name.indexOf('DiscRotor_RL') !== -1) {
-            newWheels[i].rotation.z +=  (speed / 10) * Math.PI / 180;
+            newWheels[i].rotation.z += (speed / 10) * Math.PI / 180;
           } else {
-            newWheels[i].rotation.z -=  (speed / 10) * Math.PI / 180;
+            newWheels[i].rotation.z -= (speed / 10) * Math.PI / 180;
           }
         }
 
@@ -549,7 +629,7 @@
         camera.position.z += speed * (Math.sin(carModel.rotation.y) / 200);
         moveCamera();
       }
-      camera.lookAt(carModel.position);
+      camera.lookAt(carModel.position)
       renderer.render(scene, camera);
     }
 
@@ -557,7 +637,7 @@
       const cameraX = camera.position.x - 40;
       const cameraY = camera.position.y - 30;
       const cameraZ = camera.position.z - 60;
-      controls.target.set(cameraX,cameraY,cameraZ );
+      controls.target.set(cameraX, cameraY, cameraZ);
     }
 
     let speed = 0;
