@@ -92,9 +92,20 @@
       grid.material.transparent = true;
       scene.add(grid);
 
-      var hemiLight = new THREE.HemisphereLight(0x7c849b, 0xd7cbb1, 0.1);
-      hemiLight.position.set(0, 1, 0);
-      scene.add(hemiLight);
+      // var hemiLight = new THREE.HemisphereLight(0x7c849b, 0xd7cbb1, 0.1);
+      // hemiLight.position.set(0, 1, 0);
+      // scene.add(hemiLight);
+
+      let light = new THREE.DirectionalLight( 0xffffff );
+      light.position.set( 1, 1, 1 );
+      scene.add( light );
+
+      light = new THREE.DirectionalLight( 0xffffff  );
+      light.position.set( -1, -1, -1 );
+      scene.add( light );
+
+      light = new THREE.AmbientLight( 0xffffff );
+      scene.add( light );
 
       const shadowLight = new THREE.DirectionalLight(0xffffff, 0.1);
       shadowLight.position.set(-1.5, 1.5, 1.5);
